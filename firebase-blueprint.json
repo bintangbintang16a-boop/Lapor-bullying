@@ -1,0 +1,51 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Informasi pengguna sistem (Admin, Guru BK, Siswa)",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "name": { "type": "string", "description": "Nama lengkap" },
+        "email": { "type": "string", "format": "email", "description": "Email institusi" },
+        "role": { "type": "string", "enum": ["admin", "bk", "siswa"], "description": "Role pengguna" },
+        "status": { "type": "string", "enum": ["Aktif", "Nonaktif"], "description": "Status akun" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Waktu pembuatan akun" }
+      },
+      "required": ["uid", "name", "email", "role"]
+    },
+    "Report": {
+      "title": "Report",
+      "description": "Laporan tindakan bullying",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "ID Laporan (Auto-generated)" },
+        "reporterUid": { "type": "string", "description": "UID Pelapor (null jika anonim)" },
+        "reporterName": { "type": "string", "description": "Nama Pelapor (null jika anonim)" },
+        "isAnonymous": { "type": "boolean", "description": "Apakah laporan anonim" },
+        "victimName": { "type": "string", "description": "Nama korban" },
+        "perpetratorName": { "type": "string", "description": "Nama pelaku (jika diketahui)" },
+        "location": { "type": "string", "description": "Lokasi kejadian" },
+        "date": { "type": "string", "format": "date", "description": "Tanggal kejadian" },
+        "description": { "type": "string", "description": "Deskripsi detail kejadian" },
+        "evidenceUrl": { "type": "string", "format": "uri", "description": "URL bukti foto/screenshot" },
+        "status": { "type": "string", "enum": ["Laporan Diterima", "Sedang Diproses", "Selesai"], "description": "Status laporan" },
+        "priority": { "type": "string", "enum": ["Rendah", "Sedang", "Tinggi"], "description": "Prioritas laporan" },
+        "followUp": { "type": "string", "description": "Catatan tindak lanjut dari Guru BK" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Waktu laporan dibuat" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Waktu laporan terakhir diperbarui" }
+      },
+      "required": ["victimName", "location", "date", "description", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "User",
+      "description": "Data profil pengguna"
+    },
+    "/reports/{reportId}": {
+      "schema": "Report",
+      "description": "Koleksi semua laporan bullying"
+    }
+  }
+}

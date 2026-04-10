@@ -1,0 +1,118 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {uid}
+    // Fields:
+    //   - uid: string (required)
+    //   - name: string (required)
+    //   - email: string (required, email format)
+    //   - role: string (required, ['admin', 'bk', 'siswa'])
+    //   - status: string (['Aktif', 'Nonaktif'])
+    //   - createdAt: timestamp
+    //
+    // Collection: reports
+    // Document ID: {reportId}
+    // Fields:
+    //   - reporterUid: string (optional)
+    //   - reporterName: string (optional)
+    //   - isAnonymous: bool (required)
+    //   - victimName: string (required)
+    //   - perpetratorName: string (optional)
+    //   - location: string (required)
+    //   - date: string (required, date format)
+    //   - description: string (required)
+    //   - evidenceUrl: string (optional)
+    //   - status: string (required, ['Laporan Diterima', 'Sedang Diproses', 'Selesai'])
+    //   - priority: string (['Rendah', 'Sedang', 'Tinggi'])
+    //   - followUp: string (optional)
+    //   - createdAt: timestamp (required)
+    //   - updatedAt: timestamp
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    function hasRole(role) {
+      return isAuthenticated() && getUserData().role == role;
+    }
+    
+    function isAdmin() {
+      return hasRole('admin') || 
+             (request.auth.token.email == "bintang.bintang16a@gmail.com" && request.auth.token.email_verified == true);
+    }
+    
+    function isBK() {
+      return hasRole('bk');
+    }
+    
+    function isSiswa() {
+      return hasRole('siswa');
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'name', 'email', 'role']) &&
+             data.uid is string &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.email is string && data.email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$") &&
+             data.role in ['admin', 'bk', 'siswa'];
+    }
+
+    function isValidReport(data) {
+      return data.keys().hasAll(['victimName', 'location', 'date', 'description', 'status', 'createdAt']) &&
+             data.victimName is string && data.victimName.size() > 0 && data.victimName.size() < 100 &&
+             data.location is string && data.location.size() > 0 && data.location.size() < 200 &&
+             data.description is string && data.description.size() > 0 && data.description.size() < 5000 &&
+             data.status in ['Laporan Diterima', 'Sedang Diproses', 'Selesai'];
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (isOwner(userId) || isAdmin() || isBK());
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) && (isOwner(userId) || isAdmin());
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) && 
+                    (isAdmin() || (isOwner(userId) && request.resource.data.role == resource.data.role));
+      allow delete: if isAdmin();
+    }
+
+    match /reports/{reportId} {
+      // Siswa can only read their own reports (if not anonymous)
+      // BK and Admin can read all reports
+      allow read: if isAuthenticated() && (
+        isAdmin() || isBK() || 
+        (isSiswa() && resource.data.reporterUid == request.auth.uid)
+      );
+      
+      // Any authenticated student can create a report
+      allow create: if isAuthenticated() && isSiswa() && isValidReport(request.resource.data) &&
+                    (request.resource.data.isAnonymous == true || request.resource.data.reporterUid == request.auth.uid);
+      
+      // Only BK and Admin can update reports (status, priority, followUp)
+      allow update: if isAuthenticated() && (isAdmin() || isBK()) && isValidReport(request.resource.data);
+      
+      allow delete: if isAdmin();
+    }
+  }
+}
